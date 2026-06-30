@@ -1,19 +1,67 @@
+import discord
+from discord.channel import TextChannel
 from discord.ext import commands
+from discord.commands import SlashCommandGroup
 
 from resources.shared import CONTEXTS, INTEGRATION_TYPES
 from scripts.tools import journal
 
-LOG_COMPONENT = "Modmail"
+from .config import LOG_COMPONENT
+from .database import ModmailDatabase
 
-# Test command
-@commands.slash_command(name="modmail", description="Say hi to the bot!", contexts=CONTEXTS, integration_types=INTEGRATION_TYPES)
-async def modmail(ctx):
-	journal.log(f"User {ctx.user} said MODMAIL TIMEEE!", 6, component=LOG_COMPONENT)
+database = ModmailDatabase()
 
-	await ctx.respond(f"HIIIII {ctx.author.display_name.upper()}")
+
+class ModmailButtonView(discord.ui.View):
+	def __init__(self):
+		super().__init__(timeout=None)
+
+	@discord.ui.button(label="Create thread", custom_id="create-thread", style=discord.ButtonStyle.primary, emoji="📬")
+	async def create_thread(self, button, interaction):
+		if interaction.guild is None:
+			await interaction.response.send_message("Failed to create modmail thread: Couldn't find guild", ephemeral=True)
+			return
+
+		channel_id = database.get_channel(interaction.guild.id)
+		if channel_id is None:
+			await interaction.response.send_message("No modmail channel set for this server", ephemeral=True)
+			return
+
+		channel = interaction.guild.get_channel(channel_id)
+
+		# If channel isn't already cached, fetch it from Discord
+		if channel is None:
+			journal.log(f"Couldn't find channel {channel_id} in cache, fetching from Discord", 7, component=LOG_COMPONENT)
+			channel = await interaction.guild.fetch_channel(channel_id)
+
+		await interaction.response.send_message(f"Button was pressed. Modmail channel is {channel.jump_url}", ephemeral=True)
+
+
+class Modmail(commands.Cog):
+	command_group = SlashCommandGroup("modmail", "Modmail functions", contexts=CONTEXTS, integration_types=INTEGRATION_TYPES)
+
+	@command_group.command(name="button", description="Create a modmail button", contexts=CONTEXTS, integration_types=INTEGRATION_TYPES)
+	async def create_button(self, ctx):
+		await ctx.send("Press this button to create a modmail thread", view=ModmailButtonView())
+
+		await ctx.respond("Modmail button created!", ephemeral=True)
+
+	@command_group.command(name="set_channel", description="Set what channel modmail threads should be created in for this server", contexts=CONTEXTS, integration_types=INTEGRATION_TYPES)
+	async def set_channel(self, ctx, channel: TextChannel):
+		database.set_channel(ctx.guild_id, channel.id)
+
+		await ctx.respond(f"Set the modmail channel to {channel.jump_url}")
+
+	@command_group.command(name="remove_channel", description="Removes the modmail channel for this server. This disables modmail.", contexts=CONTEXTS, integration_types=INTEGRATION_TYPES)
+	async def remove_channel(self, ctx):
+		database.remove_channel(ctx.guild_id)
+
+		await ctx.respond("Modmail removed")
+
 
 def setup(bot):
-    bot.add_application_command(modmail)
+	bot.add_cog(Modmail(bot))
+
 
 def teardown(bot):
-	journal.log("BYEEEEE!!!", 5, component=LOG_COMPONENT)
+	bot.remove_cog("Modmail")
