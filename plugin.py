@@ -18,6 +18,19 @@ class ModmailButtonView(discord.ui.View):
 
 	@discord.ui.button(label="Create thread", custom_id="create-thread", style=discord.ButtonStyle.primary, emoji="📬")
 	async def create_thread(self, button, interaction):
+		modal = ModmailCreateModal()
+		await interaction.response.send_modal(modal)
+
+
+class ModmailCreateModal(discord.ui.DesignerModal):
+	def __init__(self):
+		super().__init__(title="Create thread")
+
+		subject_input = discord.ui.Label(label="Subject")
+		subject_input.set_input_text(custom_id="subject")
+		super().add_item(subject_input)
+
+	async def callback(self, interaction: discord.Interaction):
 		if interaction.guild is None:
 			await interaction.response.send_message("Failed to create modmail thread: Couldn't find guild", ephemeral=True)
 			return
@@ -34,7 +47,12 @@ class ModmailButtonView(discord.ui.View):
 			journal.log(f"Couldn't find channel {channel_id} in cache, fetching from Discord", 7, component=LOG_COMPONENT)
 			channel = await interaction.guild.fetch_channel(channel_id)
 
-		await interaction.response.send_message(f"Button was pressed. Modmail channel is {channel.jump_url}", ephemeral=True)
+		await interaction.response.send_message("Creating private modmail thread!", ephemeral=True)
+
+		subject = self.children[0].get_item("subject").value
+
+		thread = await channel.create_thread(name=subject)
+		await thread.add_user(interaction.user)
 
 
 class Modmail(commands.Cog):
