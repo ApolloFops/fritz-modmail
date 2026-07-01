@@ -58,6 +58,13 @@ class ModmailCreateModal(discord.ui.DesignerModal):
 class Modmail(commands.Cog):
 	command_group = SlashCommandGroup("modmail", "Modmail functions", contexts=CONTEXTS, integration_types=INTEGRATION_TYPES)
 
+	def __init__(self, bot: discord.Bot):
+		self.bot = bot
+
+	@commands.Cog.listener()
+	async def on_ready(self):
+		self.bot.add_view(ModmailButtonView())
+
 	@command_group.command(name="button", description="Create a modmail button", contexts=CONTEXTS, integration_types=INTEGRATION_TYPES)
 	async def create_button(self, ctx):
 		await ctx.send("Press this button to create a modmail thread", view=ModmailButtonView())
