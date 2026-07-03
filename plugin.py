@@ -72,12 +72,14 @@ class Modmail(commands.Cog):
 		await ctx.respond("Modmail button created!", ephemeral=True)
 
 	@command_group.command(name="set_channel", description="Set what channel modmail threads should be created in for this server", contexts=CONTEXTS, integration_types=INTEGRATION_TYPES)
+	@commands.has_permissions(administrator=True)
 	async def set_channel(self, ctx, channel: TextChannel):
 		database.set_channel(ctx.guild_id, channel.id)
 
 		await ctx.respond(f"Set the modmail channel to {channel.jump_url}")
 
 	@command_group.command(name="remove_channel", description="Removes the modmail channel for this server. This disables modmail.", contexts=CONTEXTS, integration_types=INTEGRATION_TYPES)
+	@commands.has_permissions(administrator=True)
 	async def remove_channel(self, ctx):
 		database.remove_channel(ctx.guild_id)
 
